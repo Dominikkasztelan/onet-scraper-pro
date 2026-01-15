@@ -35,7 +35,7 @@ Aby uruchomić scraper i zobaczyć logi w konsoli:
 ```bash
 python -m scrapy crawl onet
 ```
-Dane trafią do pliku `data_production.jsonl`.
+Dane trafią do nowo utworzonego pliku z sygnaturą czasową, np. `data_2026-01-15_18-30-00.jsonl`.
 
 ### Na Serwerze (Produkcja / Linux VPS)
 Aby uruchomić proces w tle (nohup), który nie zostanie przerwany po wylogowaniu:

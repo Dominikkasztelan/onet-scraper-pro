@@ -95,3 +95,63 @@ def test_parse_item_fallback(spider):
     assert item['title'] == "Fallback Title"
     assert item['author'] == "Fallback Author"
     assert item['date'] == "2026-01-14"
+
+def test_parse_item_filters_old_articles(spider):
+    # Article from 2020 (way older than 3 days)
+    html = """
+    <html>
+        <head>
+            <script type="application/ld+json">
+            {
+                "@context": "https://schema.org",
+                "@type": "NewsArticle",
+                "datePublished": "2020-01-01T12:00:00+01:00", 
+                "headline": "Old News"
+            }
+            </script>
+        </head>
+        <body class="hyphenate">
+            <h1>Old Title</h1>
+        </body>
+    </html>
+    """
+    request = Request(url="https://wiadomosci.onet.pl/old-article")
+    response = HtmlResponse(
+        url="https://wiadomosci.onet.pl/old-article",
+        request=request,
+        body=html.encode('utf-8')
+    )
+    
+    # Should yield nothing because it's filtered
+    results = list(spider.parse_item(response))
+    assert len(results) == 0
+
+def test_parse_item_malformed_json_ld(spider):
+    # JSON-LD is broken/invalid JSON
+    html = """
+    <html>
+        <head>
+            <script type="application/ld+json">
+            { broken json here ... 
+            </script>
+        </head>
+        <body>
+            <h1>Title</h1>
+            <div id="lead">Lead</div>
+            <span class="ods-m-date-authorship__publication">2026-01-15 10:00</span>
+            <p class="hyphenate">Content must be present.</p>
+        </body>
+    </html>
+    """
+    request = Request(url="https://wiadomosci.onet.pl/malformed")
+    response = HtmlResponse(
+        url="https://wiadomosci.onet.pl/malformed",
+        request=request,
+        body=html.encode('utf-8')
+    )
+    
+    # Should handle error gracefully and try fallback/cleanup logic
+    # In this mock, we have valid fallback date in span, so it SHOULD succeed
+    results = list(spider.parse_item(response))
+    assert len(results) == 1
+    assert results[0]['title'] == "Title"
