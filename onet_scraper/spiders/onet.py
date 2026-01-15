@@ -158,29 +158,46 @@ class OnetSpider(CrawlSpider):
                             image_url = response.xpath('//meta[@property="og:image"]/@content').get()
 
                         # --- Content Cleaning ---
+                        # Normalize text to handle &nbsp; (\xa0) and other weird whitespace
+                        clean_content = full_content.replace('\xa0', ' ')
+                        
                         # Filter out known boilerplates
-                        clean_content = full_content
                         scam_phrases = [
                             "Dołącz do Premium",
                             "i odblokuj wszystkie funkcje", 
                             "dla materiałów Premium",
                             "Onet Premium",
                             "Kliknij tutaj",
-                            "Zobacz także"
+                            "Zobacz także",
+                            "redakcja", # Often at the end
+                            "Źródło:"
                         ]
                         
-                        # Only keep text BEFORE the premium cutoff if found
-                        premium_marker = "Dołącz do Premium"
-                        if premium_marker in clean_content:
-                            clean_content = clean_content.split(premium_marker)[0]
+                        # Cutoff markers - stop reading if we hit these
+                        cutoff_markers = [
+                            "Dołącz do Premium",
+                            "i odblokuj wszystkie funkcje",
+                            "Zobacz także",
+                            "Onet Premium"
+                        ]
+                        
+                        for marker in cutoff_markers:
+                            if marker in clean_content:
+                                clean_content = clean_content.split(marker)[0]
                         
                         # Remove other junk lines
                         lines = clean_content.split('\n')
                         filtered_lines = []
                         for line in lines:
+                            # Skip lines containing scam phrases (double check after split)
                             if any(phrase in line for phrase in scam_phrases):
                                 continue
-                            if len(line.strip()) < 5: # Remove very short artifact lines
+                            # Skip lines that are just whitespace
+                            if not line.strip():
+                                continue
+                            # Skip very short lines that might be artifacts (unless they look like subheaders?)
+                            # Relaxed length check to 3 to allow valid short words/numbers, but keep it tight
+                            if len(line.strip()) < 3: 
                                 continue
                             filtered_lines.append(line)
                         
