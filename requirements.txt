@@ -1,0 +1,3 @@
+scrapy==2.14.1
+pydantic==2.12.5
+itemadapter==0.13.1

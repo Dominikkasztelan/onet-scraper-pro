@@ -1,0 +1,26 @@
+# --- Python & Venv ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# --- Scrapy ---
+.scrapy/
+*.log
+
+# --- Wyniki działania (Dane nie idą do repo!) ---
+*.json
+*.jsonl
+*.csv
+*.xml
+
+# --- IDE (Pycharm/VSCode - to ustawienia lokalne) ---
+.idea/
+.vscode/
+
+# --- Sekrety (NAJWAŻNIEJSZE) ---
+.env
+keys.json
+secrets.py
