@@ -19,7 +19,7 @@ class OnetSpider(CrawlSpider):
     """
     name = 'onet'
     allowed_domains = ['wiadomosci.onet.pl']
-    start_urls = ['https://wiadomosci.onet.pl/swiat/nie-tylko-grenlandia-i-wenezuela-majstersztyk-donalda-trumpa-w-przyczolku-putina/htj1fsq']
+    start_urls = ['https://wiadomosci.onet.pl/', 'https://wiadomosci.onet.pl/kraj', 'https://wiadomosci.onet.pl/swiat']
 
     custom_settings = {
         'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -46,7 +46,6 @@ class OnetSpider(CrawlSpider):
         return None
 
     def parse_item(self, response):
-        self.logger.info(f"DEBUG: parse_item called for {response.url}")
         json_ld_date = response.xpath('//meta[@property="article:published_time"]/@content').get()
         visible_date = response.css('.dateMeta::text').get()
         date_to_check = json_ld_date if json_ld_date else visible_date
