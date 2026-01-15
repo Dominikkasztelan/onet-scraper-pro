@@ -25,6 +25,7 @@ class OnetSpider(CrawlSpider):
         Rule(LinkExtractor(
             allow=(r'wiadomosci\.onet\.pl/[a-z0-9-]+/[a-z0-9-]+/[a-z0-9]+'), 
             deny=(r'#', r'autorzy', r'oferta', r'partner', r'reklama', r'promocje', r'sponsored'), 
+            restrict_css=('.ods-c-card-wrapper', '.ods-o-card'),
             unique=True
         ), callback='parse_item', follow=False),
         Rule(LinkExtractor(allow=(r'wiadomosci.onet.pl'), restrict_xpaths='//a[contains(@class, "next")]'), follow=True),
