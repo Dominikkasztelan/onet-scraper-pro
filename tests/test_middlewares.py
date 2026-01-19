@@ -8,14 +8,13 @@ import urllib.error
 
 @pytest.fixture
 def middleware():
-    return UrllibDownloaderMiddleware()
+    return UrllibDownloaderMiddleware(user_agent='TestUserAgent/1.0')
 
 @pytest.fixture
 def spider():
     mock_spider = MagicMock()
     mock_spider.logger = MagicMock()
-    mock_spider.settings = MagicMock()
-    mock_spider.settings.get.return_value = 'TestUserAgent/1.0'
+    # Settings no longer needed here for UA, handled in init/from_crawler
     return mock_spider
 
 def test_process_request_intercepts_onet(middleware, spider):
@@ -68,7 +67,7 @@ def test_process_request_handles_exception(middleware, spider):
         assert result is None
 
 def test_process_request_uses_user_agent(middleware, spider):
-    """Verify that User-Agent from settings is used in the request."""
+    """Verify that User-Agent from init is used in the request."""
     request = Request(url="https://wiadomosci.onet.pl/artykul")
     
     with patch('urllib.request.urlopen') as mock_urlopen, \
@@ -85,8 +84,8 @@ def test_process_request_uses_user_agent(middleware, spider):
         mock_request_class.assert_called_once()
         call_args = mock_request_class.call_args
         headers = call_args[1]['headers'] if 'headers' in call_args[1] else call_args[0][1] if len(call_args[0]) > 1 else {}
-        # The headers dict should contain User-Agent
-        assert 'User-Agent' in headers or headers.get('User-Agent') == 'TestUserAgent/1.0'
+        # The headers dict should contain User-Agent set in fixture
+        assert headers.get('User-Agent') == 'TestUserAgent/1.0'
 
 def test_process_request_handles_oserror(middleware, spider):
     """Test that OSError (network issues) is handled gracefully."""

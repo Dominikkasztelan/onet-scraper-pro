@@ -11,14 +11,23 @@ class UrllibDownloaderMiddleware:
     Refactored to be asynchronous to avoid blocking Scrapy's event loop.
     """
     
-    def _do_request(self, request_url: str, user_agent: str) -> Optional[tuple]:
+    def __init__(self, user_agent='Mozilla/5.0'):
+        self.user_agent = user_agent
+    
+    @classmethod
+    def from_crawler(cls, crawler):
+        # Retrieve settings from crawler
+        ua = crawler.settings.get('USER_AGENT', 'Mozilla/5.0')
+        return cls(user_agent=ua)
+
+    def _do_request(self, request_url: str) -> Optional[tuple]:
         """
         Synchronous helper method to perform the blocking urllib request.
         Returns tuple (url, status, body) or None on failure.
         """
         try:
             headers = {
-                'User-Agent': user_agent
+                'User-Agent': self.user_agent
             }
             req = urllib.request.Request(request_url, headers=headers)
             
@@ -28,8 +37,6 @@ class UrllibDownloaderMiddleware:
                 status = response.status
                 return (url, status, body)
         except (urllib.error.URLError, OSError) as e:
-            # We log this in the main thread to have access to spider logger more easily, 
-            # or we can print here. Better to return None and log in process_request.
             return None
 
     async def process_request(self, request, spider) -> Optional[HtmlResponse]:
@@ -37,12 +44,9 @@ class UrllibDownloaderMiddleware:
         if 'onet.pl' in request.url:
             spider.logger.debug(f"UrllibMiddleware: Intercepting {request.url}")
             
-            # Get User-Agent from spider settings
-            user_agent = spider.settings.get('USER_AGENT', 'Mozilla/5.0')
-            
             # Offload blocking call to thread
             loop = asyncio.get_running_loop()
-            result = await loop.run_in_executor(None, self._do_request, request.url, user_agent)
+            result = await loop.run_in_executor(None, self._do_request, request.url)
             
             if result:
                 url, status, body = result
@@ -50,6 +54,6 @@ class UrllibDownloaderMiddleware:
                 return HtmlResponse(url=url, status=status, body=body, encoding='utf-8', request=request)
             else:
                 spider.logger.error(f"UrllibMiddleware Error: Failed to fetch {request.url} via urllib")
-                return None # Let Scrapy try standard downloader if urllib fails
+                return None 
                 
         return None
