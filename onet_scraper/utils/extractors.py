@@ -57,8 +57,8 @@ def extract_json_ld(response: Response) -> Dict[str, Optional[str]]:
             else:
                 process_node(data)
             
-            if found:
-                break
+            # if found: break  <-- Removed to allow gathering metadata from multiple scripts
+            pass
         except (json.JSONDecodeError, ValueError, TypeError):
             continue
             

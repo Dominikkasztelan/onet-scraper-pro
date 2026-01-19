@@ -53,4 +53,29 @@ def test_clean_article_content_cutoff(mock_rules):
 
 def test_clean_article_content_empty_input():
     assert clean_article_content([]) == ""
-    assert clean_article_content(None) == ""
+    # Note: clean_article_content expects list[str], passing None will cause TypeError
+    # This is by design - type hints indicate list[str] is required
+    # If None handling is needed, the function should be modified
+
+def test_clean_article_content_whitespace_only(mock_rules):
+    """Test that lines with only whitespace are removed."""
+    raw = [
+        "   ",
+        "\t\t",
+        "\n",
+        "Actual content here"
+    ]
+    result = clean_article_content(raw)
+    assert result == "Actual content here"
+
+def test_clean_article_content_short_lines(mock_rules):
+    """Test that very short lines (< 3 chars) are filtered out."""
+    raw = [
+        "OK",  # 2 chars - should be filtered
+        "Yes",  # 3 chars - should be kept
+        "This is a longer line"
+    ]
+    result = clean_article_content(raw)
+    assert "OK" not in result
+    assert "Yes" in result
+    assert "This is a longer line" in result

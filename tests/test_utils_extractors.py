@@ -62,22 +62,99 @@ def test_extract_json_ld_graph():
         {
             "@graph": [
                 {
-                    "@type": "WebPage",
-                    "datePublished": "2026-01-01"
+                    "@type": "NewsArticle",
+                    "datePublished": "2026-01-01",
+                    "author": {"name": "Graph Author"},
+                    "articleSection": "Politics"
                 },
                 {
-                    "@type": "Person",
-                    "name": "Jane Doe"
+                    "@type": "WebPage",
+                    "name": "Some Page"
                 }
             ]
         }
         </script>
     </html>
     """
-    # Note: current implementation is greedy, it updates metadata from all nodes
     response = HtmlResponse(url="http://test.com", body=html.encode('utf-8'))
     metadata = extract_json_ld(response)
     
     assert metadata['datePublished'] == "2026-01-01"
-    # It might pick up author if mapped correctly in code. 
-    # Let's check implementation of author extraction in graph loop.
+    assert metadata['author'] == "Graph Author"
+    assert metadata['articleSection'] == "Politics"
+
+def test_extract_json_ld_author_list():
+    """Test extraction when author is a list of persons."""
+    html = """
+    <html>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "datePublished": "2026-01-01",
+            "author": [
+                {"@type": "Person", "name": "First Author"},
+                {"@type": "Person", "name": "Second Author"}
+            ]
+        }
+        </script>
+    </html>
+    """
+    response = HtmlResponse(url="http://test.com", body=html.encode('utf-8'))
+    metadata = extract_json_ld(response)
+    
+    # Implementation takes first author from list
+    assert metadata['author'] == "First Author"
+
+def test_extract_json_ld_image_string():
+    """Test extraction when image is a plain string URL."""
+    html = """
+    <html>
+        <script type="application/ld+json">
+        {
+            "datePublished": "2026-01-01",
+            "image": "http://example.com/image.jpg"
+        }
+        </script>
+    </html>
+    """
+    response = HtmlResponse(url="http://test.com", body=html.encode('utf-8'))
+    metadata = extract_json_ld(response)
+    
+    assert metadata['image_url'] == "http://example.com/image.jpg"
+
+def test_extract_json_ld_no_data():
+    """Test behavior when no JSON-LD is present."""
+    html = "<html><body>No JSON-LD here</body></html>"
+    response = HtmlResponse(url="http://test.com", body=html.encode('utf-8'))
+    metadata = extract_json_ld(response)
+    
+    assert metadata['datePublished'] is None
+    assert metadata['author'] is None
+
+def test_extract_json_ld_distributed():
+    """Test extraction when metadata is split across multiple JSON-LD scripts."""
+    html = """
+    <html>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "NewsArticle",
+            "datePublished": "2026-01-01"
+        }
+        </script>
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "Person",
+            "author": {"name": "Split Author"}
+        }
+        </script>
+    </html>
+    """
+    response = HtmlResponse(url="http://test.com", body=html.encode('utf-8'))
+    metadata = extract_json_ld(response)
+    
+    # Should get date from first script AND author from second
+    assert metadata['datePublished'] == "2026-01-01"
+    assert metadata['author'] == "Split Author"
+

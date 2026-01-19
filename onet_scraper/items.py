@@ -21,7 +21,10 @@ class ArticleItem(BaseModel):
     def clean_title(cls, v):
         if not v:
             raise ValueError("Tytuł jest pusty!")
-        return v.strip()
+        v = v.strip()
+        if not v:
+            raise ValueError("Tytuł jest pusty!")
+        return v
 
     @field_validator('url')
     def validate_url(cls, v):

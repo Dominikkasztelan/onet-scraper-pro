@@ -84,7 +84,5 @@ def test_rules_deny_patterns():
     # deny=(r'#', r'autorzy', r'oferta', r'partner', r'reklama', r'promocje', r'sponsored')
     
     for url in denied_urls:
-         # Note: 'sponsored' is in query param, deny regex usually applies to absolute url.
-         # 'partner' is in path.
-         if 'partner' in url:
-             assert url not in extracted_urls
+         # Assert that NONE of the denied URLs were extracted
+         assert url not in extracted_urls, f"Should NOT extract denied URL: {url}"
