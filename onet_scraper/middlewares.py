@@ -1,59 +1,58 @@
 
-import asyncio
-import urllib.request
+from curl_cffi.requests import AsyncSession
 from scrapy.http import HtmlResponse
 from typing import Optional
 
-class UrllibDownloaderMiddleware:
+class AsyncCurlMiddleware:
     """
-    Middleware to bypass simple anti-bot protections by using urllib instead of Scrapy's downloader
-    for specific domains.
-    Refactored to be asynchronous to avoid blocking Scrapy's event loop.
+    Middleware to bypass anti-bot protections using curl_cffi.
+    Features TLS fingerprint impersonation with round-robin profile rotation.
     """
     
-    def __init__(self, user_agent='Mozilla/5.0'):
-        self.user_agent = user_agent
+    BROWSER_PROFILES = [
+        # Chrome Desktop
+        "chrome110", "chrome116", "chrome119", "chrome120",
+        "chrome123", "chrome124", "chrome131",
+        # Chrome Android
+        "chrome99_android", "chrome131_android",
+        # Safari
+        "safari15_3", "safari15_5", "safari17_0", "safari17_2_ios",
+        "safari18_0", "safari18_0_ios",
+        # Edge
+        "edge99", "edge101",
+    ]
+    
+    def __init__(self):
+        self._profile_index = 0
     
     @classmethod
     def from_crawler(cls, crawler):
-        # Retrieve settings from crawler
-        ua = crawler.settings.get('USER_AGENT', 'Mozilla/5.0')
-        return cls(user_agent=ua)
-
-    def _do_request(self, request_url: str) -> Optional[tuple]:
-        """
-        Synchronous helper method to perform the blocking urllib request.
-        Returns tuple (url, status, body) or None on failure.
-        """
-        try:
-            headers = {
-                'User-Agent': self.user_agent
-            }
-            req = urllib.request.Request(request_url, headers=headers)
-            
-            with urllib.request.urlopen(req) as response:
-                body = response.read()
-                url = response.geturl()
-                status = response.status
-                return (url, status, body)
-        except (urllib.error.URLError, OSError) as e:
-            return None
+        return cls()
+    
+    def _get_next_profile(self) -> str:
+        """Round-robin profile selection."""
+        profile = self.BROWSER_PROFILES[self._profile_index]
+        self._profile_index = (self._profile_index + 1) % len(self.BROWSER_PROFILES)
+        return profile
 
     async def process_request(self, request, spider) -> Optional[HtmlResponse]:
-        # Only use urllib for Onet domain to bypass protection
         if 'onet.pl' in request.url:
-            spider.logger.debug(f"UrllibMiddleware: Intercepting {request.url}")
+            profile = self._get_next_profile()
+            spider.logger.debug(f"AsyncCurlMiddleware: [{profile}] {request.url}")
             
-            # Offload blocking call to thread
-            loop = asyncio.get_running_loop()
-            result = await loop.run_in_executor(None, self._do_request, request.url)
-            
-            if result:
-                url, status, body = result
-                spider.logger.debug(f"UrllibMiddleware: Success {status} for {url}")
-                return HtmlResponse(url=url, status=status, body=body, encoding='utf-8', request=request)
-            else:
-                spider.logger.error(f"UrllibMiddleware Error: Failed to fetch {request.url} via urllib")
-                return None 
+            try:
+                async with AsyncSession(impersonate=profile) as session:
+                    response = await session.get(request.url)
+                    
+                    return HtmlResponse(
+                        url=request.url,
+                        status=response.status_code,
+                        body=response.content,
+                        encoding='utf-8',
+                        request=request
+                    )
+            except Exception as e:
+                spider.logger.error(f"AsyncCurlMiddleware Error: {e}")
+                return None
                 
         return None

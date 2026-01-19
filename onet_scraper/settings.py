@@ -45,7 +45,7 @@ LOG_LEVEL = 'INFO'
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 DOWNLOADER_MIDDLEWARES = {
-   'onet_scraper.middlewares.UrllibDownloaderMiddleware': 543,
+   'onet_scraper.middlewares.AsyncCurlMiddleware': 543,
 }
 
 # Enable or disable extensions

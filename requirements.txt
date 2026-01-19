@@ -3,3 +3,5 @@ pydantic==2.12.5
 itemadapter==0.13.1
 pytest==9.0.2
 pytest-mock==3.12.0
+curl_cffi>=0.6.0
+pytest-asyncio
