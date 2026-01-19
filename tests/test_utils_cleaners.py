@@ -76,6 +76,9 @@ def test_clean_article_content_short_lines(mock_rules):
         "This is a longer line"
     ]
     result = clean_article_content(raw)
-    assert "OK" not in result
-    assert "Yes" in result
-    assert "This is a longer line" in result
+    result_lines = result.split('\n')
+    
+    # Check that "OK" is not a separate line in the result
+    assert "OK" not in result_lines, "Short line 'OK' should be filtered out"
+    assert "Yes" in result_lines, "Line 'Yes' (3 chars) should be kept"
+    assert "This is a longer line" in result_lines
