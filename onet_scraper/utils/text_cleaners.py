@@ -2,33 +2,34 @@ import json
 import logging
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1)
-def load_cleaning_rules() -> Dict[str, List[str]]:
+def load_cleaning_rules() -> dict[str, list[str]]:
     """
     Loads cleaning rules from resources/cleaning_rules.json.
     Cached explicitly to avoid repeated I/O.
     """
+    default_rules = {"scam_phrases": [], "cutoff_markers": []}
     try:
         current_dir = Path(__file__).parent
         # Go up one level to onet_scraper, then to resources
         config_path = current_dir.parent / "resources" / "cleaning_rules.json"
 
+        if not config_path.exists():
+            logger.warning(f"Cleaning rules file not found at: {config_path}")
+            return default_rules
+
         with open(config_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except (OSError, json.JSONDecodeError) as e:
         logger.error(f"Failed to load cleaning rules: {e}")
-        return {"scam_phrases": [], "cutoff_markers": []}
+        return default_rules
 
 
-# Removed global side-effect: RULES = load_cleaning_rules()
-
-
-def clean_article_content(content_list: list[str]) -> str:
+def clean_article_content(content_list: list[str] | None) -> str:
     """
     Cleans the raw content list by removing boilerplate, scams, and handling whitespace.
     """

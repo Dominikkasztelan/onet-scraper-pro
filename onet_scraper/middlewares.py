@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from curl_cffi import requests as curl_requests
 from scrapy.http import HtmlResponse
@@ -15,10 +15,9 @@ class TorMiddleware:
     Middleware to bypass anti-bot protections using curl_cffi + Tor Network.
     Features:
     - TLS fingerprint impersonation (Chrome/Safari)
-    - TLS fingerprint impersonation (Chrome/Safari)
     - Automatic IP rotation via Tor Control Port on 403 blocks
 
-    Refactored to use synchronous curl_cffi in a thread pool.
+    Refactored to use synchronous curl_cffi in a thread pool with configurable timeouts.
     """
 
     BROWSER_PROFILES: list[str] = [
@@ -41,11 +40,20 @@ class TorMiddleware:
         "edge101",
     ]
 
-    def __init__(self, tor_proxy="socks5://127.0.0.1:9050", control_port=9051, password=None):
+    def __init__(
+        self,
+        tor_proxy: str = "socks5://127.0.0.1:9050",
+        control_port: int = 9051,
+        password: str | None = None,
+        timeout: int = 30,
+        max_retries: int = 3,
+    ):
         self._profile_index = 0
         self.tor_proxy = tor_proxy
         self.control_port = control_port
         self.password = password
+        self.timeout = timeout
+        self.max_retries = max_retries
 
     @classmethod
     def from_crawler(cls, crawler):
@@ -53,6 +61,8 @@ class TorMiddleware:
             tor_proxy=crawler.settings.get("TOR_PROXY", "socks5://127.0.0.1:9050"),
             control_port=crawler.settings.getint("TOR_CONTROL_PORT", 9051),
             password=crawler.settings.get("TOR_PASSWORD", None),
+            timeout=crawler.settings.getint("TOR_CONNECTION_TIMEOUT", 30),
+            max_retries=crawler.settings.getint("TOR_MAX_RETRIES", 3),
         )
 
     def _get_next_profile(self) -> str:
@@ -62,35 +72,46 @@ class TorMiddleware:
 
     def _sync_renew_identity(self):
         """Synchronous Tor identity renewal."""
-        with Controller.from_port(port=self.control_port) as controller:
-            if self.password:
-                controller.authenticate(password=self.password)
-            else:
-                controller.authenticate()  # Cookie auth
-            controller.signal(Signal.NEWNYM)
+        try:
+            with Controller.from_port(port=self.control_port) as controller:
+                if self.password:
+                    controller.authenticate(password=self.password)
+                else:
+                    controller.authenticate()  # Cookie auth
+                controller.signal(Signal.NEWNYM)
+        except Exception as e:
+            logger.error(f"Failed to renew Tor identity: {e}")
 
     async def _renew_tor_identity(self):
         """Signals Tor to change identity (get new IP) - async wrapper."""
-        try:
-            await asyncio.to_thread(self._sync_renew_identity)
-        except Exception as e:
-            logger.error(f"Tor Control Error: {e}")
+        await asyncio.to_thread(self._sync_renew_identity)
 
-    def _sync_make_request(self, url: str, profile: str) -> Tuple[int, bytes, str, Dict[str, Any]]:
+    def _sync_make_request(
+        self, url: str, profile: str
+    ) -> tuple[int, bytes, str, dict[str, Any]]:
         """
         Synchronous HTTP request via curl_cffi with Tor proxy.
         Returns: (status_code, content, final_url, headers)
         """
-        response = curl_requests.get(
-            url,
-            impersonate=profile,
-            proxies={"http": self.tor_proxy, "https": self.tor_proxy},
-            timeout=60,
-            allow_redirects=True,
-        )
-        return (response.status_code, response.content, str(response.url), dict(response.headers))
+        try:
+            response = curl_requests.get(
+                url,
+                impersonate=profile,
+                proxies={"http": self.tor_proxy, "https": self.tor_proxy},
+                timeout=self.timeout,
+                allow_redirects=True,
+            )
+            return (
+                response.status_code,
+                response.content,
+                str(response.url),
+                dict(response.headers),
+            )
+        except Exception as e:
+            # Re-raise to be caught by the caller
+            raise e
 
-    async def process_request(self, request, spider) -> Optional[HtmlResponse]:
+    async def process_request(self, request, spider) -> HtmlResponse | None:
         if "onet.pl" not in request.url:
             return None
 
@@ -111,18 +132,41 @@ class TorMiddleware:
             ]
 
             if status_code in [403, 503] or is_soft_ban:
-                ban_type = "Soft Ban (Redirect)" if is_soft_ban else f"Block ({status_code})"
-                spider.logger.warning(f"TorMiddleware: {ban_type}! Rotating IP and Retrying...")
+                ban_type = (
+                    "Soft Ban (Redirect)" if is_soft_ban else f"Block ({status_code})"
+                )
+                spider.logger.warning(
+                    f"TorMiddleware: {ban_type}! Rotating IP and Retrying..."
+                )
                 await self._renew_tor_identity()
+                
+                # Signal Scrapy to retry the request (by returning a Response with a retry-able status or raising DoNotProcess)
+                # But here we just return 504 (Gateway Timeout) to trigger Scrapy's retry middleware if enabled, or just fail.
+                # Returning 504 is a reasonable way to say "Proxy failed".
                 return HtmlResponse(
-                    url=request.url, status=504, request=request, body=b"Tor Soft Ban / Block", encoding="utf-8"
+                    url=request.url,
+                    status=504,
+                    request=request,
+                    body=b"Tor Soft Ban / Block",
+                    encoding="utf-8",
                 )
 
             return HtmlResponse(
-                url=final_url, status=status_code, body=content, encoding="utf-8", request=request, headers=headers
+                url=final_url,
+                status=status_code,
+                body=content,
+                encoding="utf-8",
+                request=request,
+                headers=headers,
             )
 
         except Exception as e:
-            spider.logger.error(f"TorMiddleware Error: {e}. Rotating IP...")
+            spider.logger.error(f"TorMiddleware Connection Error: {e}. Rotating IP...")
             await self._renew_tor_identity()
-            return HtmlResponse(url=request.url, status=504, request=request, body=b"Tor Timeout", encoding="utf-8")
+            return HtmlResponse(
+                url=request.url,
+                status=504,
+                request=request,
+                body=f"Tor Error: {str(e)}".encode("utf-8"),
+                encoding="utf-8",
+            )

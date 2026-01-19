@@ -1,23 +1,21 @@
-from typing import Optional
-
 from pydantic import BaseModel, field_validator
 
 
 class ArticleItem(BaseModel):
     title: str
     url: str
-    date: str
-    lead: Optional[str] = None
-    content: Optional[str] = None
+    date: str  # Kept as str to match scraped format, could be datetime in future
+    lead: str | None = None
+    content: str | None = None
 
     # New production fields
-    author: Optional[str] = None
-    keywords: Optional[str] = None
-    section: Optional[str] = None
-    date_modified: Optional[str] = None
-    image_url: Optional[str] = None
-    id: Optional[str] = None
-    read_time: Optional[int] = None  # in minutes
+    author: str | None = None
+    keywords: str | None = None
+    section: str | None = None
+    date_modified: str | None = None
+    image_url: str | None = None
+    id: str | None = None
+    read_time: int | None = None  # in minutes
 
     @field_validator("title")
     def clean_title(cls, v):

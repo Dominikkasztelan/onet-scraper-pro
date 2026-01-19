@@ -1,4 +1,6 @@
-from typing import Any, Dict, Generator
+import re
+from collections.abc import Generator
+from typing import Any
 
 from scrapy.http import Response
 from scrapy.linkextractors import LinkExtractor
@@ -32,6 +34,9 @@ class OnetSpider(CrawlSpider):
         "LOG_LEVEL": "INFO",
     }
 
+    # Compiled Regexes for Performance
+    ID_PATTERN = re.compile(r"/([a-z0-9]+)$")
+
     rules = (
         Rule(
             LinkExtractor(
@@ -57,7 +62,7 @@ class OnetSpider(CrawlSpider):
     def skip_request(self, request: Any, response: Response) -> None:
         return None
 
-    def parse_item(self, response: Response) -> Generator[Dict[str, Any], None, None]:
+    def parse_item(self, response: Response) -> Generator[dict[str, Any], None, None]:
         # 1. External Utils extraction (keep complex logic in utils)
         metadata = extract_json_ld(response)
 
@@ -124,9 +129,7 @@ class OnetSpider(CrawlSpider):
         # ID
         l.add_xpath("id", '//meta[@name="data-story-id"]/@content')
         # Fallback ID from URL
-        import re
-
-        id_match = re.search(r"/([a-z0-9]+)$", response.url)
+        id_match = self.ID_PATTERN.search(response.url)
         if id_match:
             l.add_value("id", id_match.group(1))
 
