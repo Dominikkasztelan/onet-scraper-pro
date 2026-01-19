@@ -28,8 +28,8 @@ class OnetSpider(CrawlSpider):
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "DOWNLOAD_DELAY": 2.0,
         "CONCURRENT_REQUESTS_PER_DOMAIN": 1,
-        "DEPTH_LIMIT": 3,
-        "CLOSESPIDER_PAGECOUNT": 200,
+        "DEPTH_LIMIT": 5,
+        "CLOSESPIDER_PAGECOUNT": 0,  # 0 = Unlimited items
         "ROBOTSTXT_OBEY": False,
         "LOG_LEVEL": "INFO",
     }
@@ -44,6 +44,7 @@ class OnetSpider(CrawlSpider):
             ),
             process_request="skip_request",
         ),
+        # Rule for Articles
         Rule(
             LinkExtractor(
                 allow=(r"wiadomosci\.onet\.pl/[a-z0-9-]+/[a-z0-9-]+/[a-z0-9]+"),
@@ -54,6 +55,15 @@ class OnetSpider(CrawlSpider):
             callback="parse_item",
             follow=False,
         ),
+        # Rule for Categories (Follow to find more articles)
+        Rule(
+            LinkExtractor(
+                allow=(r"wiadomosci\.onet\.pl/[a-z0-9-]+$"),
+                deny=(r"szukaj", r"autorzy", r"redakcja", r"pogoda"),
+            ),
+            follow=True,
+        ),
+        # Rule for Pagination (Next Page)
         Rule(
             LinkExtractor(allow=(r"wiadomosci.onet.pl"), restrict_xpaths='//a[contains(@class, "next")]'), follow=True
         ),

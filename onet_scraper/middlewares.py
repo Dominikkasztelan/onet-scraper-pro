@@ -151,6 +151,11 @@ class TorMiddleware:
                     encoding="utf-8",
                 )
 
+            # curl_cffi handles decompression, so we must remove Content-Encoding
+            # to prevent Scrapy from trying to decompress it again.
+            headers.pop("Content-Encoding", None)
+            headers.pop("content-encoding", None)
+
             return HtmlResponse(
                 url=final_url,
                 status=status_code,
