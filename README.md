@@ -1,4 +1,4 @@
-# Onet Scraper Pro
+# Onet Scraper
 
 Profesjonalny scraper danych z portalu Onet.pl, przygotowany do pracy produkcyjnej (24/7). Narzędzie pobiera artykuły, czyści treść z reklam i zapisuje dane w formacie JSONL. Wykorzystuje sieć Tor do anonimizacji i rotacji IP.
 

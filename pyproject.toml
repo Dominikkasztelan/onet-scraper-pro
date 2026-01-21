@@ -1,5 +1,5 @@
 [project]
-name = "onet-scraper-pro"
+name = "onet-scraper"
 version = "1.0.0"
 requires-python = ">=3.10"
 
